@@ -21,43 +21,64 @@ menu = {
 }
 
 # --- SIDEBAR: INGREDIENT PRICING (Option 2) ---
-st.sidebar.header("💰 Ingredient Costs (Unit Price)")
+st.sidebar.header("💰 Step 1: Set Ingredient Costs")
 ing_prices = {}
 all_ingredients = sorted(list(set(item for meal in menu.values() for item in meal["ingredients"])))
 
 for ing in all_ingredients:
-    ing_prices[ing] = st.sidebar.number_input(f"Price of {ing}", min_value=0.0, value=1.0, step=0.1)
+    ing_prices[ing] = st.sidebar.number_input(f"Price of 1 unit of {ing}", min_value=0.0, value=1.0, step=0.1)
 
 # --- MAIN INTERFACE ---
 tab1, tab2 = st.tabs(["🚀 Option 1: Production Plan", "📊 Option 2: Financials"])
 
 with tab1:
     st.header("Daily Production Order")
+    st.info("Enter the number of meals you want to prepare today to see the total cost.")
+    
     cols = st.columns(2)
     order = {}
     
     # Input how many of each meal
     for i, meal in enumerate(menu.keys()):
         col = cols[0] if i % 2 == 0 else cols[1]
-        order[meal] = col.number_input(f"Quantity of {meal}", min_value=0, step=1)
+        order[meal] = col.number_input(f"Quantity of {meal}", min_value=0, step=1, key=f"prod_{meal}")
 
-    if st.button("Calculate Shopping List"):
-        shopping_list = {}
+    if st.button("Calculate Shopping List & Total Cost"):
+        shopping_list = []
+        grand_total = 0.0
+        
+        # Calculate totals for each ingredient needed
+        temp_list = {}
         for meal, qty in order.items():
             if qty > 0:
                 for ing, amt in menu[meal]["ingredients"].items():
-                    shopping_list[ing] = shopping_list.get(ing, 0) + (amt * qty)
+                    temp_list[ing] = temp_list.get(ing, 0) + (amt * qty)
+        
+        # Build the final table with prices
+        for ing, total_qty in temp_list.items():
+            cost_for_this_item = total_qty * ing_prices[ing]
+            shopping_list.append({
+                "Ingredient": ing,
+                "Total Quantity": total_qty,
+                "Unit Price": f"${ing_prices[ing]:.2f}",
+                "Subtotal": f"${cost_for_this_item:.2f}",
+                "numeric_subtotal": cost_for_this_item
+            })
+            grand_total += cost_for_this_item
         
         if shopping_list:
             st.subheader("🛒 Total Ingredients Needed")
-            df_shop = pd.DataFrame(list(shopping_list.items()), columns=["Ingredient", "Total Quantity"])
+            df_shop = pd.DataFrame(shopping_list).drop(columns=["numeric_subtotal"])
             st.table(df_shop)
+            
+            # Grand Total Display
+            st.metric(label="Estimated Total Cost for Production", value=f"${grand_total:.2f}")
         else:
             st.warning("Please enter at least one meal quantity.")
 
 with tab2:
     st.header("Profitability Analysis")
-    
+    # ... (Rest of the financial logic remains the same)
     financial_data = []
     for meal, data in menu.items():
         m_price = data["price"]
@@ -73,13 +94,3 @@ with tab2:
     
     df_fin = pd.DataFrame(financial_data)
     st.dataframe(df_fin, use_container_width=True)
-    
-    # Visual Chart
-    st.subheader("Profit vs Cost per Meal")
-    chart_data = pd.DataFrame([
-        {"Meal": d["Meal"], 
-         "Cost": sum(ing_prices[ing] * amt for ing, amt in menu[d["Meal"]]["ingredients"].items()),
-         "Profit": menu[d["Meal"]]["price"] - sum(ing_prices[ing] * amt for ing, amt in menu[d["Meal"]]["ingredients"].items())}
-        for d in financial_data
-    ]).set_index("Meal")
-    st.bar_chart(chart_data)
