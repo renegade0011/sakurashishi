@@ -11,8 +11,25 @@ st.set_page_config(
 
 st.title("🌸 Sakura Sushi: Production & Profit Manager")
 
-# --- DATA INITIALIZATION ---
-# Meal names updated with Emojis
+# --- FIXED DATA & CRAFTING LOGIC ---
+# User defined prices
+base_prices = {
+    "Sugar": 2.0,
+    "Rice": 2.0,
+    "Tea": 2.0,
+    "Wasabi": 4.0,
+    "Broth": 5.0,
+    "Sakura": 4.0,
+    "Noodles": 5.0,
+    "Chicken": 6.5,
+    "Milk": 3.0,
+    "Salmon": 5.0,   # Set to a default, can be adjusted in app
+    "Anchovy": 3.0   # Set to a default, can be adjusted in app
+}
+
+# 1 Milk = 3 Butter logic
+butter_cost = base_prices["Milk"] / 3
+
 menu = {
     "🍣 Sushi Roll": {"price": 25, "ingredients": {"Salmon": 1, "Rice": 1, "Wasabi": 1}},
     "🍜 Chicken Ramen": {"price": 25, "ingredients": {"Noodles": 1, "Broth": 1, "Chicken": 1}},
@@ -26,39 +43,20 @@ menu = {
     "🌿 Matcha": {"price": 25, "ingredients": {"Tea": 3, "Milk": 2, "Sugar": 2}}
 }
 
+# --- SIDEBAR: PRICING ---
+st.sidebar.header("📁 Inventory & Costs")
+st.sidebar.info(f"💡 Crafting Info: 1 Milk (${base_prices['Milk']}) creates 3 Butter. Butter cost set to ${butter_cost:.2f}")
+
+ing_prices = {}
 all_ingredients = sorted(list(set(item for meal in menu.values() for item in meal["ingredients"])))
 
-# --- SIDEBAR: DATA MANAGEMENT ---
-st.sidebar.header("📁 Data Management")
-
-# Upload existing prices
-uploaded_file = st.sidebar.file_uploader("Upload your saved prices (CSV)", type="csv")
-loaded_prices = {}
-
-if uploaded_file is not None:
-    df_upload = pd.read_csv(uploaded_file)
-    loaded_prices = dict(zip(df_upload["Ingredient"], df_upload["Price"]))
-    st.sidebar.success("Prices Loaded!")
-
-# --- SIDEBAR: INGREDIENT PRICING ---
-st.sidebar.header("💰 Step 1: Set Costs")
-ing_prices = {}
-
 for ing in all_ingredients:
-    # Uses uploaded price if available, otherwise defaults to 1.0
-    val = float(loaded_prices.get(ing, 1.0))
-    ing_prices[ing] = st.sidebar.number_input(f"Price: {ing}", min_value=0.0, value=val, step=0.1, key=f"price_{ing}")
-
-# Download button to save for next time
-df_save = pd.DataFrame(list(ing_prices.items()), columns=["Ingredient", "Price"])
-csv_buffer = io.StringIO()
-df_save.to_csv(csv_buffer, index=False)
-st.sidebar.download_button(
-    label="💾 Download Prices to Save",
-    data=csv_buffer.getvalue(),
-    file_name="sakura_sushi_prices.csv",
-    mime="text/csv",
-)
+    if ing == "Butter":
+        ing_prices[ing] = butter_cost
+        st.sidebar.text(f"Butter: ${butter_cost:.2f} (from Milk)")
+    else:
+        default_p = base_prices.get(ing, 1.0)
+        ing_prices[ing] = st.sidebar.number_input(f"Price: {ing}", min_value=0.0, value=float(default_p), step=0.1)
 
 # --- MAIN INTERFACE ---
 tab1, tab2 = st.tabs(["🚀 Production Plan", "📊 Profit Analysis"])
