@@ -10,16 +10,49 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for Sakura theme
+# 2. High-Contrast Deep Blue Theme
 st.markdown("""
     <style>
-    .main { background-color: #fff5f7; }
-    .stMetric { background-color: #ffe0e9; padding: 15px; border-radius: 10px; }
-    .invoice-box { border: 1px solid #eee; padding: 20px; border-radius: 10px; background-color: white; }
+    /* Main Background */
+    .main { background-color: #f4f7f9; }
+    
+    /* Metric Card Styling - DEEP BLUE with WHITE TEXT */
+    [data-testid="stMetric"] {
+        background-color: #004080 !important;
+        padding: 20px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    
+    /* Metric Value (The Price/Number) */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 2.8rem !important;
+    }
+    
+    /* Metric Label (The Text) */
+    [data-testid="stMetricLabel"] {
+        color: #e0e0e0 !important;
+        font-size: 1.2rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+    }
+    
+    /* Styling for the Invoicing Box */
+    .invoice-container {
+        background-color: white;
+        padding: 25px;
+        border-radius: 15px;
+        border: 2px solid #004080;
+    }
+    
+    /* Headers */
+    h1, h2, h3 { color: #004080; font-family: 'Helvetica Neue', sans-serif; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🌸 Sakura Sushi: Manager & Invoicing")
+st.title("🌸 Sakura Sushi Manager")
 
 # --- DATA INITIALIZATION ---
 base_prices = {
@@ -28,7 +61,7 @@ base_prices = {
     "Milk": 3.0, "Anchovy": 3.0
 }
 
-# Crafting Logic: 1 Milk ($3) = 3 Butter ($1 each)
+# 1 Milk = 3 Butter
 butter_cost = base_prices["Milk"] / 3
 
 menu = {
@@ -44,29 +77,27 @@ menu = {
     "🌿 Matcha": {"price": 25.0, "ingredients": {"Tea": 3, "Milk": 2, "Sugar": 2}}
 }
 
-# --- SIDEBAR: COSTS ---
-st.sidebar.header("📁 Inventory Costs")
+# --- SIDEBAR ---
+st.sidebar.header("⚙️ Cost Inventory")
 ing_prices = {}
 all_ingredients = sorted(list(set(item for meal in menu.values() for item in meal["ingredients"])))
-
 for ing in all_ingredients:
     if ing == "Butter":
         ing_prices[ing] = butter_cost
-        st.sidebar.write(f"🧈 Butter: ${butter_cost:.2f} (Auto)")
+        st.sidebar.caption(f"🧈 Butter: ${butter_cost:.2f} (from Milk)")
     else:
-        default_p = base_prices.get(ing, 1.0)
-        ing_prices[ing] = st.sidebar.number_input(f"Price: {ing}", min_value=0.0, value=float(default_p), step=0.1)
+        ing_prices[ing] = st.sidebar.number_input(f"{ing} ($)", min_value=0.0, value=float(base_prices.get(ing, 1.0)), step=0.1)
 
-# --- MAIN INTERFACE ---
-tab1, tab2, tab3 = st.tabs(["🚀 Production Plan", "📊 Profit Analysis", "🧾 Facturation (Invoicing)"])
+# --- TABS ---
+tab1, tab2, tab3 = st.tabs(["📋 Production", "📊 Analysis", "💰 Invoicing"])
 
-# OPTION 1: PRODUCTION
+# --- TAB 1: PRODUCTION ---
 with tab1:
-    st.header("Daily Production Order")
+    st.subheader("Inventory Preparation")
     cols = st.columns(2)
     order = {meal: cols[i % 2].number_input(f"{meal}", min_value=0, step=1, key=f"p_{meal}") for i, meal in enumerate(menu.keys())}
     
-    if st.button("Calculate Shopping List"):
+    if st.button("Generate Shopping List"):
         totals = {}
         for meal, qty in order.items():
             if qty > 0:
@@ -75,33 +106,29 @@ with tab1:
         if totals:
             shop_df = pd.DataFrame([{"Ingredient": k, "Qty": v, "Total Cost": f"${v*ing_prices[k]:.2f}"} for k, v in totals.items()])
             st.table(shop_df)
-            st.metric("Total Order Cost", f"${sum(v*ing_prices[k] for k, v in totals.items()):.2f}")
+            st.metric("Required Budget", f"${sum(v*ing_prices[k] for k, v in totals.items()):.2f}")
 
-# OPTION 2: PROFIT ANALYSIS
+# --- TAB 2: ANALYSIS ---
 with tab2:
-    st.header("Financial Performance")
+    st.subheader("Profit Breakdown per Item")
     fin_list = []
     for meal, data in menu.items():
         cost = sum(ing_prices[ing] * amt for ing, amt in data["ingredients"].items())
         fin_list.append({"Meal": meal, "Price": f"${data['price']}", "Cost": f"${cost:.2f}", "Profit": f"${(data['price']-cost):.2f}"})
     st.dataframe(pd.DataFrame(fin_list), use_container_width=True)
 
-# NEW OPTION 3: FACTURATION
+# --- TAB 3: INVOICING (Facturation) ---
 with tab3:
-    st.header("Create New Invoice")
+    st.subheader("Customer Invoicing")
     c_name = st.text_input("Customer Name", "Guest")
     inv_cols = st.columns(2)
-    items_ordered = {}
+    items_ordered = {meal: inv_cols[i % 2].number_input(f"Add {meal}", min_value=0, step=1, key=f"inv_{meal}") for i, meal in enumerate(menu.keys())}
     
-    for i, meal in enumerate(menu.keys()):
-        col = inv_cols[i % 2]
-        items_ordered[meal] = col.number_input(f"Add {meal}", min_value=0, step=1, key=f"inv_{meal}")
-    
-    if st.button("Generate Facture"):
+    if st.button("Process Order & Show Receipt"):
+        st.markdown(f'<div class="invoice-container">', unsafe_allow_html=True)
+        st.markdown(f"### RECEIPT: SAKURA SUSHI")
+        st.markdown(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Client:** {c_name}")
         st.markdown("---")
-        st.subheader(f"Receipt: Sakura Sushi")
-        st.write(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        st.write(f"**Customer:** {c_name}")
         
         invoice_data = []
         total_bill = 0.0
@@ -111,16 +138,18 @@ with tab3:
             if qty > 0:
                 price = menu[meal]['price']
                 cost = sum(ing_prices[ing] * amt for ing, amt in menu[meal]["ingredients"].items())
-                subtotal = price * qty
-                invoice_data.append({"Item": meal, "Qty": qty, "Unit Price": f"${price:.2f}", "Total": f"${subtotal:.2f}"})
-                total_bill += subtotal
+                invoice_data.append({"Item": meal, "Qty": qty, "Price": f"${price:.2f}", "Total": f"${price * qty:.2f}"})
+                total_bill += (price * qty)
                 total_cost += (cost * qty)
         
         if invoice_data:
             st.table(pd.DataFrame(invoice_data))
-            c1, c2 = st.columns(2)
-            c1.metric("Total to Pay", f"${total_bill:.2f}")
-            c2.metric("Net Profit on Order", f"${total_bill - total_cost:.2f}", delta_color="normal")
-            st.button("Print Invoice (Ctrl+P)")
+            
+            # THE HIGH-CONTRAST SECTION
+            m_col1, m_col2 = st.columns(2)
+            m_col1.metric("TOTAL TO PAY", f"${total_bill:.2f}")
+            m_col2.metric("NET PROFIT", f"${total_bill - total_cost:.2f}")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.warning("Please add at least one item to the invoice.")
+            st.warning("Please select at least one meal to generate an invoice.")
